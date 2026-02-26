@@ -1,0 +1,32 @@
+{
+  "psql": {
+    "columns": [
+      "country",
+      "city",
+      "occupation",
+      "field"
+    ],
+    "first_row": {
+      "country": "Brazil",
+      "city": "Sao Paulo",
+      "occupation": "Software Engineer",
+      "field": "Technology"
+    },
+    "row_count": 25000
+  },
+  "elastic": {
+    "columns": [
+      "country",
+      "city",
+      "occupation",
+      "field"
+    ],
+    "first_row": {
+      "country": "Switzerland",
+      "city": "Zurich",
+      "occupation": "Operations Manager",
+      "field": "Operations"
+    },
+    "row_count": 25000
+  }
+}
