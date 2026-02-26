@@ -396,11 +396,11 @@ with sc2:
     with search_box:
         user_query = st.text_input("Query", label_visibility="collapsed", placeholder="Search by role, skill, or location...", value=st.session_state.search_query)
     with search_btn:
-        search_button = st.button("Search AI", type="primary", use_container_width=True)
+        search_button = st.button("Search", type="primary", use_container_width=True)
 
         # 7. BACKEND INTEGRATION LOGIC
 if search_button and user_query:
-    with st.status("🔍 Intelligence Insights...", expanded=True) as status:
+    with st.status("🔍 Searching Databases...", expanded=True) as status:
         try:
             # API Request to your FastAPI backend
             response = requests.get(f"http://localhost:8000/search?q={user_query}")
@@ -424,11 +424,6 @@ if search_button and user_query:
                         <div style="font-size:10px; color:#64748B; font-weight:700;">VERIFIED RECORDS</div>
                         <div style="font-size:28px; font-weight:800; color:#4C6FFF;">{v_res['total_found']}</div>
                     </div>""", unsafe_allow_html=True)
-                    if i_res['active']:
-                        st.markdown(f"""<div class="res-card" style="text-align:center; margin-top: 10px; border-color: #8B5CF6;">
-                            <div style="font-size:10px; color:#64748B; font-weight:700;">INFERRED RECORDS</div>
-                            <div style="font-size:28px; font-weight:800; color:#8B5CF6;">{i_res['total_found']}</div>
-                        </div>""", unsafe_allow_html=True)
                 st.info(f"**Analysis:** {extracted.get('reasoning', 'Extracted parameters for optimized search.')}")
 
             # SECTION 1: VERIFIED RESULTS
@@ -454,22 +449,6 @@ if search_button and user_query:
             else:
                 st.info("No matching verified records found across your ecosystem.")
 
-            # SECTION 2: AI-INFERRED RESULTS (Conditional)
-            if i_res["active"]:
-                st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
-                st.markdown("""
-                <div style="padding: 15px; border-left: 5px solid #8B5CF6; background: #F5F3FF; border-radius: 8px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.1);">
-                    <h3 style="margin: 0; color: #5B21B6; font-size: 20px;">✨ AI-Inferred Contextual Results</h3>
-                    <p style="margin: 5px 0 0 0; color: #7C3AED; font-weight: 600; font-size: 14px;">
-                        ⚠️ Disclaimer: These results include AI-based contextual assumptions (see reasoning above).
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if i_res["data"]:
-                    st.dataframe(pd.DataFrame(i_res["data"]), use_container_width=True, hide_index=True)
-                else:
-                    st.caption("AI generated semantic assumptions, but no new matching records were found.")
 
             # SECTION 3: SOURCE DATA BREAKDOWN
             st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)

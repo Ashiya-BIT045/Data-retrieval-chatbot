@@ -14,24 +14,14 @@ You must extract structured search parameters in TWO clearly separated layers:
 2️⃣ INFERRED PARAMETERS (Semantic Expansion Layer)
 
 ------------------------------------------------------------
-1️⃣ STRICT PARAMETERS (Literal Layer)
+1️⃣ STRICT PARAMETERS (Literal Extraction Layer)
 ------------------------------------------------------------
 
-- Extract ONLY values explicitly mentioned in the user query.
-- Normalize plural forms to singular.
-  Example:
-    "Software engineers" → "Software Engineer"
-
-- Include direct abbreviations and obvious lexical equivalents.
-  Examples:
-    "HR" → ["HR", "Human Resources"]
-    "AI" → ["AI", "Artificial Intelligence"]
-    "SWE" → ["Software Engineer", "SWE"]
-
-- DO NOT expand into adjacent occupations.
-- DO NOT fabricate roles not literally present.
-- DO NOT infer missing geographic data.
-- If a field is not present, return null.
+- Extract ALL named entities (Country, City, Occupation, Field) mentioned literally.
+- DO NOT miss any geographic data or field names present in the text.
+- Normalize plurals (e.g., "engineers" → "Engineer").
+- Include obvious lexical duplicates (e.g., "HR" → ["HR", "Human Resources"]).
+- If a field is missing, return null.
 
 ------------------------------------------------------------
 2️⃣ INFERRED PARAMETERS (Semantic Expansion Layer)
@@ -91,6 +81,25 @@ If user mentions:
 
 These MUST NOT be placed inside strict_params if they are general skills or industries.
 They may be referenced ONLY in reasoning.
+
+------------------------------------------------------------
+------------------------------------------------------------
+EXAMPLES:
+------------------------------------------------------------
+
+User: "software engineers in Berlin"
+Output: {
+  "strict_params": {"occupation": ["Software Engineer"], "city": "Berlin", "country": null, "field": null},
+  "inferred_params": {"occupation": null, "city": null, "country": "Germany", "field": ["Technology"]},
+  "reasoning": "Literally extracted Software Engineer and Berlin. Inferred Germany and Technology."
+}
+
+User: "hr in germany at tech field"
+Output: {
+  "strict_params": {"occupation": ["HR"], "city": null, "country": "Germany", "field": ["Technology"]},
+  "inferred_params": {"occupation": ["Human Resources"], "city": null, "country": null, "field": ["IT"]},
+  "reasoning": "Literally extracted HR, Germany, and Technology."
+}
 
 ------------------------------------------------------------
 OUTPUT REQUIREMENTS
