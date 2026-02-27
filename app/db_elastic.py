@@ -77,26 +77,27 @@ class ElasticSearchClient:
         search_params = {k: params.get(k) for k in searchable_keys if params.get(k)}
         
         if not search_params:
-            return []
+            return [], ""
 
         if self.use_fallback:
             self._load_local_repo()
             results = []
             for item in self.local_repo:
-                match = False
+                match_all = True
                 for key, value in search_params.items():
+                    field_val = str(item.get(key, "")).lower()
                     if isinstance(value, list):
                         # Match if any synonym matches the item field
-                        if any(str(syn).lower() in str(item.get(key, "")).lower() for syn in value):
-                            match = True
+                        if not any(str(syn).lower() in field_val for syn in value):
+                            match_all = False
                             break
                     else:
-                        if str(value).lower() in str(item.get(key, "")).lower():
-                            match = True
+                        if str(value).lower() not in field_val:
+                            match_all = False
                             break
-                if match:
+                if match_all:
                     results.append(item)
-            return results[:20]
+            return results[:100], f"Local JSON Filter: {json.dumps(search_params)}"
 
         must_filters = []
         for key, value in search_params.items():
@@ -141,11 +142,11 @@ class ElasticSearchClient:
             response = requests.post(f"{self.url}/{ELASTIC_INDEX}/_search", json=query, timeout=10)
             if response.status_code == 200:
                 hits = response.json()["hits"]["hits"]
-                return [hit["_source"] for hit in hits]
+                return [hit["_source"] for hit in hits], json.dumps(query, indent=2)
             else:
                 logger.error(f"Elasticsearch search failed: {response.status_code} - {response.text}")
-                return []
+                return [], json.dumps(query, indent=2)
         except Exception as e:
             logger.error(f"Elasticsearch search error: {e}")
-            return []
+            return [], json.dumps(query, indent=2)
 

@@ -4,18 +4,14 @@
 User Query:
 "{{ query }}"
 
-------------------------------------------------------------
 CORE EXTRACTION PRINCIPLES
-------------------------------------------------------------
 
 You must extract structured search parameters in TWO clearly separated layers:
 
-1️⃣ STRICT PARAMETERS (Literal Extraction Layer)
-2️⃣ INFERRED PARAMETERS (Semantic Expansion Layer)
+STRICT PARAMETERS (Literal Extraction Layer)
+INFERRED PARAMETERS (Semantic Expansion Layer)
 
-------------------------------------------------------------
-1️⃣ STRICT PARAMETERS (Literal Extraction Layer)
-------------------------------------------------------------
+STRICT PARAMETERS (Literal Extraction Layer)
 
 - Extract ALL named entities (Country, City, Occupation, Field) mentioned literally.
 - DO NOT miss any geographic data or field names present in the text.
@@ -23,29 +19,27 @@ You must extract structured search parameters in TWO clearly separated layers:
 - Include obvious lexical duplicates (e.g., "HR" → ["HR", "Human Resources"]).
 - If a field is missing, return null.
 
-------------------------------------------------------------
-2️⃣ INFERRED PARAMETERS (Semantic Expansion Layer)
-------------------------------------------------------------
+INFERRED PARAMETERS (Semantic Expansion Layer)
 
 Populate ONLY if deeper reasoning is required and logically safe.
 
 Allowed inferences:
 
-✔ If a city is provided but country is missing:
+If a city is provided but country is missing:
    Infer the correct country from the city.
    Example:
      "Bangalore" → country: ["India"]
 
-✔ If a LANGUAGE is mentioned AND country is missing:
+If a LANGUAGE is mentioned AND country is missing:
    Infer the primary associated country.
    Example:
      "Hindi" → country: ["India"]
 
-✔ If occupation clearly implies a broader field:
+If occupation clearly implies a broader field:
    Example:
      "AI Engineer" → inferred field: ["Artificial Intelligence", "Technology"]
 
-✔ If field synonym is used:
+If field synonym is used:
    "tech" → ["Technology", "IT"]
 
 STRICT LIMITATIONS:
@@ -55,9 +49,7 @@ STRICT LIMITATIONS:
 - DO NOT hallucinate skills, experience, salary, or company.
 - DO NOT expand into adjacent roles (e.g., AI Engineer ≠ Data Scientist unless explicitly mentioned).
 
-------------------------------------------------------------
-⚠ DATABASE CONSTRAINT AWARENESS
-------------------------------------------------------------
+DATABASE CONSTRAINT AWARENESS
 
 The database contains ONLY:
 
@@ -76,16 +68,14 @@ If user mentions:
 - automobile
 - tech sector
 
-### SPECIAL HANDLING:
+SPECIAL HANDLING:
 - Roles like "DevOps", "Site Reliability Engineer", "AI Engineer", "Data Scientist" are OCCUPATIONS, not just fields or skills. Categorize them as occupations in strict_params.
 
 These MUST NOT be placed inside strict_params if they are general skills or industries.
 They may be referenced ONLY in reasoning.
 
-------------------------------------------------------------
-------------------------------------------------------------
+
 EXAMPLES:
-------------------------------------------------------------
 
 User: "software engineers in Berlin"
 Output: {
@@ -101,17 +91,14 @@ Output: {
   "reasoning": "Literally extracted HR, Germany, and Technology."
 }
 
-------------------------------------------------------------
+
 OUTPUT REQUIREMENTS
-------------------------------------------------------------
 
 Return STRICT JSON only.
 No markdown.
 No explanation outside JSON.
 
-------------------------------------------------------------
 EXPECTED JSON FORMAT
-------------------------------------------------------------
 
 {
   "strict_params": {

@@ -426,6 +426,14 @@ if search_button and user_query:
                     </div>""", unsafe_allow_html=True)
                 st.info(f"**Analysis:** {extracted.get('reasoning', 'Extracted parameters for optimized search.')}")
 
+            # Display Raw Queries
+            with st.expander("💾 Raw Database Queries", expanded=False):
+                rq = data.get("raw_queries", {})
+                st.markdown("#### PostgreSQL Query")
+                st.code(rq.get("postgres", "N/A"), language="sql")
+                st.markdown("#### Elasticsearch Query")
+                st.code(rq.get("elasticsearch", "N/A"), language="json")
+
             # SECTION 1: VERIFIED RESULTS
             st.markdown("""
             <div style="margin-top: 20px; padding: 15px; border-left: 5px solid #3B82F6; background: #EFF6FF; border-radius: 8px;">

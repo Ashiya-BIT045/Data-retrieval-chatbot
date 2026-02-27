@@ -76,7 +76,7 @@ def search_pg(params: dict):
     
     if not search_params:
         db.close()
-        return []
+        return [], ""
 
     # Implement AND logic for different fields, but OR logic within lists of synonyms
     filters = []
@@ -92,12 +92,15 @@ def search_pg(params: dict):
                     for i, syn in enumerate(val):
                         # Unique Parameter binding to prevent SQL injection & param name clashes
                         pname = f"tsquery_{key}_{i}"
-                        field_filters.append(text(f"search_vector @@ plainto_tsquery('english', :{pname})").bindparams(**{pname: syn}))
-                        field_filters.append(getattr(Job, key).ilike(f"%{syn}%"))
+                        # Check vector but ALSO check the column explicitly for higher precision
+                        field_filters.append(and_(
+                            text(f"search_vector @@ plainto_tsquery('english', :{pname})").bindparams(**{pname: syn}),
+                            getattr(Job, key).ilike(f"%{syn}%")
+                        ))
                     filters.append(or_(*field_filters))
                 else:
                     pname = f"tsquery_{key}_single"
-                    filters.append(or_(
+                    filters.append(and_(
                         text(f"search_vector @@ plainto_tsquery('english', :{pname})").bindparams(**{pname: val}),
                         getattr(Job, key).ilike(f"%{val}%")
                     ))
@@ -112,9 +115,16 @@ def search_pg(params: dict):
     if filters:
         query = query.filter(and_(*filters))
     
+    # Capture the SQL query
+    try:
+        raw_sql = str(query.statement.compile(compile_kwargs={"literal_binds": True}))
+    except Exception:
+        raw_sql = str(query.statement)
+
     results = query.all()
     db.close()
-    return [
+    
+    data = [
         {
             "country": job.country,
             "city": job.city,
@@ -122,3 +132,4 @@ def search_pg(params: dict):
             "field": job.field
         } for job in results
     ]
+    return data, raw_sql

@@ -21,6 +21,20 @@ es_client = ElasticSearchClient()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def remove_duplicates(pg_res, es_res):
+    seen = set()
+    merged = []
+    dupes = 0
+    for item in pg_res + es_res:
+        if "error" in item: continue
+        key = (item.get("occupation"), item.get("field"), item.get("city"), item.get("country"))
+        if key not in seen:
+            seen.add(key)
+            merged.append(item)
+        else:
+            dupes += 1
+    return merged, dupes
+
 @app.get("/search")
 def search(q: str):
     logger.info(f"Received search query: {q}")
@@ -40,90 +54,70 @@ def search(q: str):
     strict = extracted_params.get("strict_params", {})
     inferred = extracted_params.get("inferred_params", {})
     
-    def remove_duplicates(pg_res, es_res):
-        seen = set()
-        merged = []
-        dupes = 0
-        for item in pg_res + es_res:
-            if "error" in item: continue
-            key = (item["occupation"], item["field"], item["city"], item["country"])
-            if key not in seen:
-                seen.add(key)
-                merged.append(item)
-            else:
-                dupes += 1
-        return merged, dupes
+    # Merge strict and inferred params for a unified "Best Effort" Search Agenda
+    # We prioritize strict, but if inferred adds a country/city missing from strict, we use it.
+    unified_query = {}
+    for key in ["occupation", "field", "city", "country"]:
+        s_val = strict.get(key)
+        i_val = inferred.get(key)
+        
+        # Combine lists (synonyms) from both layers
+        combined = []
+        if isinstance(s_val, list): combined.extend(s_val)
+        elif s_val: combined.append(s_val)
+        
+        if isinstance(i_val, list): combined.extend(i_val)
+        elif i_val: combined.append(i_val)
+        
+        # Remove duplicates from the synonym list
+        if combined:
+            unified_query[key] = list(dict.fromkeys([str(x) for x in combined if x]))
 
     # ------------------
-    # 2. STRICT QUERIES (VERIFIED RESULTS)
+    # 2. UNIFIED SEARCH
     # ------------------
+    pg_query_raw, es_query_raw = "", ""
     try:
-        pg_strict = search_pg(strict)
+        pg_results, pg_query_raw = search_pg(unified_query)
     except Exception as e:
-        logger.exception("PostgreSQL strict search failed")
-        pg_strict = [{"error": str(e)}]
+        logger.exception("PostgreSQL search failed")
+        pg_results = []
         
     try:
-        es_strict = es_client.search_elastic(strict)
+        es_results, es_query_raw = es_client.search_elastic(unified_query)
     except Exception as e:
-        logger.exception("Elasticsearch strict search failed")
-        es_strict = [{"error": str(e)}]
+        logger.exception("Elasticsearch search failed")
+        es_results = []
         
-    merged_strict, strict_dupes = remove_duplicates(pg_strict, es_strict)
+    merged_results, total_dupes = remove_duplicates(pg_results, es_results)
 
     # ------------------
-    # 3. INFERRED QUERIES (AI CONTEXTUAL RESULTS)
-    # ------------------
-    # Only execute inferred search if the LLM provided inferred rules
-    merged_inferred, inferred_dupes = [], 0
-    pg_inferred_res, es_inferred_res = [], []
-    
-    # Check if there are actual non-null values in the inferred dict
-    has_inferences = any(v is not None for v in inferred.values())
-    
-    if has_inferences:
-        try:
-            pg_inferred_res = search_pg(inferred)
-        except Exception:
-            pass
-            
-        try:
-            es_inferred_res = es_client.search_elastic(inferred)
-        except Exception:
-            pass
-            
-        raw_merged_inferred, inferred_dupes = remove_duplicates(pg_inferred_res, es_inferred_res)
-        
-        # PREVENT DUPLICATES ACROSS SECTIONS:
-        # We do not want to show an item in "Inferred Results" if it already showed up in "Verified Results"
-        verified_keys = {(i.get("occupation"), i.get("field"), i.get("city"), i.get("country")) for i in merged_strict}
-        
-        for item in raw_merged_inferred:
-            key = (item.get("occupation"), item.get("field"), item.get("city"), item.get("country"))
-            if key not in verified_keys:
-                merged_inferred.append(item)
-    
-    # ------------------
-    # 4. BUILD RESPONSE
+    # 3. BUILD RESPONSE
     # ------------------
     return {
         "status": "success",
         "query": q,
         "extracted_params": extracted_params,
+        "unified_query": unified_query,
+        "raw_queries": {
+            "postgres": pg_query_raw,
+            "elasticsearch": es_query_raw
+        },
         "results": {
             "verified": {
-                "total_found": len(merged_strict),
-                "duplicates_removed": strict_dupes,
-                "data": merged_strict,
-                "postgres_found": len([x for x in pg_strict if "error" not in x]),
-                "elastic_found": len([x for x in es_strict if "error" not in x]),
-                "postgres_data": [x for x in pg_strict if "error" not in x],
-                "elastic_data": [x for x in es_strict if "error" not in x]
+                "total_found": len(merged_results),
+                "duplicates_removed": total_dupes,
+                "data": merged_results,
+                "postgres_found": len(pg_results),
+                "elastic_found": len(es_results),
+                "postgres_data": pg_results,
+                "elastic_data": es_results
             },
             "inferred": {
-                "total_found": len(merged_inferred),
-                "data": merged_inferred,
-                "active": has_inferences
+                "total_found": 0,
+                "data": [],
+                "active": False,
+                "note": "Results merged into verified section"
             }
         }
     }
